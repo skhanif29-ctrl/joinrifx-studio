@@ -1,1 +1,658 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Block Search Engines from Indexing -->
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>JoinRIFX AI Cricket Broadcast Studio (Private)</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060913;
+    --card: #0d1428;
+    --cyan: #00E5FF;
+    --purple: #6a11cb;
+    --blue: #4A00FF;
+    --gold: #F5AF19;
+    --red: #ff2a5f;
+    --green: #00e676;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+  h1, h2, h3, .logo, .tv-big-score, .tv-team { font-family: 'Montserrat', sans-serif; }
+  body { background: var(--bg); color: #fff; min-height: 100vh; }
+
+  /* ADMIN PIN LOCK SCREEN */
+  #pinLockScreen {
+    position: fixed; inset: 0; background: radial-gradient(circle at center, #111b3a 0%, #05070f 100%);
+    display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px; text-align: center;
+  }
+  .lock-card {
+    background: var(--card); border: 2px solid var(--cyan); border-radius: 16px; padding: 28px 24px; max-width: 360px; width: 100%;
+    box-shadow: 0 0 30px rgba(0, 229, 255, 0.25);
+  }
+  .lock-card h2 { color: var(--cyan); font-size: 22px; margin-bottom: 6px; }
+  .lock-card p { font-size: 12px; color: #94a3b8; margin-bottom: 16px; }
+  .pin-input {
+    width: 100%; background: #060913; border: 1.5px solid var(--purple); color: var(--cyan); font-size: 24px;
+    font-weight: 900; text-align: center; letter-spacing: 8px; padding: 12px; border-radius: 10px; margin-bottom: 14px;
+  }
+  .unlock-btn {
+    width: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); color: #fff; border: none;
+    padding: 12px; border-radius: 10px; font-weight: 900; font-size: 15px; cursor: pointer;
+  }
+
+  /* Navigation */
+  .nav { background: linear-gradient(90deg, #090e24, var(--purple)); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--cyan); position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 20px; font-weight: 900; color: var(--cyan); letter-spacing: 1px; text-shadow: 0 0 10px rgba(0,229,255,0.4); }
+  .logo span { color: #fff; }
+  .nav-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .nav-btn { background: rgba(0,0,0,0.45); color: #fff; border: 1px solid var(--cyan); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .nav-btn.active { background: var(--cyan); color: #000; }
+
+  .section { display: none; padding: 14px; max-width: 1200px; margin: auto; }
+  .section.active { display: block; }
+
+  /* Match Cards */
+  .grid-matches { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; margin-top: 10px; }
+  .match-card { background: var(--card); border: 1px solid #1e2d52; border-radius: 10px; padding: 14px; }
+  .match-card:hover { border-color: var(--cyan); }
+  .badge-live { background: var(--red); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .teams { font-size: 17px; font-weight: 900; margin: 8px 0; }
+  .go-btn { width: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); color: #fff; border: none; padding: 9px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+
+  /* TV BROADCAST SCREEN (16:9 Cyberpunk Style) */
+  #broadcastSection.active { padding: 0; max-width: 100%; height: calc(100vh - 48px); display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+  .tv-header { background: linear-gradient(90deg, #080d21, #1a1046, #7a0026); padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--cyan); }
+  .tv-body { display: grid; grid-template-columns: 1.7fr 1.3fr; gap: 10px; padding: 8px 14px; flex: 1; position: relative; overflow: hidden; }
+  
+  /* Left Score & Sound Controls */
+  .tv-left { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+  .tv-score-panel { background: linear-gradient(135deg, #0d152e, #152247); border: 1.5px solid var(--cyan); border-radius: 12px; padding: 12px 16px; box-shadow: 0 0 18px rgba(0,229,255,0.15); flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+  .tv-big-score { font-size: 44px; font-weight: 900; color: #fff; text-shadow: 0 0 12px rgba(0,229,255,0.5); }
+  .tv-team { font-size: 26px; font-weight: 900; color: var(--cyan); }
+  .tv-stats { display: flex; justify-content: space-between; background: rgba(0,0,0,0.5); padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; border: 1px solid #1e325c; }
+
+  /* Sound & Control Strip */
+  .sound-strip { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; background: #0a1022; border: 1px solid #243763; padding: 6px 8px; border-radius: 8px; }
+  .snd-btn { background: #162242; color: #fff; border: 1px solid var(--cyan); padding: 5px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .snd-btn.on { background: var(--green); color: #000; border-color: var(--green); }
+  .snd-btn.purple-on { background: var(--purple); color: #fff; border-color: var(--cyan); }
+  .snd-btn.gold { background: var(--gold); color: #000; border: none; }
+
+  /* Right Deep Pitch & Matchup Analytics */
+  .tv-right { background: var(--card); border: 1.5px solid var(--purple); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
+  .ai-badge { background: linear-gradient(90deg, var(--purple), var(--blue)); color: var(--cyan); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-bottom: 6px; border: 1px solid var(--cyan); }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  .mini-stat { background: #080d1c; border: 1px solid #1e2d52; padding: 6px 8px; border-radius: 6px; font-size: 11px; }
+  .mini-stat b { color: var(--gold); display: block; font-size: 10px; }
+  .matchup-box { background: #080d1c; border-left: 3px solid var(--cyan); padding: 6px 8px; font-size: 11px; line-height: 1.4; margin-bottom: 6px; }
+  .promo-box { background: linear-gradient(90deg, var(--purple), #2575fc); padding: 8px; border-radius: 8px; text-align: center; border: 1px solid var(--cyan); }
+  .promo-box h4 { font-size: 12px; color: var(--gold); }
+  .promo-box p { font-size: 11px; font-weight: 600; }
+
+  /* OVERLAYS (Ad Overlay & SRS Pitch Overlay — Separate!) */
+  .overlay-screen { position: absolute; inset: 8px 14px; background: rgba(6, 9, 19, 0.97); border: 2px solid var(--gold); border-radius: 12px; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 16px; z-index: 50; }
+  .overlay-screen.srs-theme { border-color: var(--cyan); }
+  .overlay-screen h2 { color: var(--gold); font-size: 20px; margin-bottom: 8px; }
+  .overlay-screen.srs-theme h2 { color: var(--cyan); }
+  .sponsor-banner-img { max-height: 115px; border-radius: 8px; border: 1px solid var(--cyan); margin: 6px 0; display: none; }
+  .srs-grid-big { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 760px; width: 100%; text-align: left; margin: 8px 0; }
+  .srs-card-item { background: #0f1933; border: 1px solid #28427a; padding: 8px 12px; border-radius: 8px; font-size: 12px; }
+  .srs-card-item b { color: var(--gold); display: block; font-size: 11px; }
+
+  /* Ticker */
+  .ticker-wrap { background: var(--gold); color: #000; padding: 5px 0; font-weight: 700; font-size: 13px; overflow: hidden; white-space: nowrap; }
+  .ticker { display: inline-block; padding-left: 100%; animation: scroll 22s linear infinite; }
+  @keyframes scroll { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+
+  /* Forms */
+  .box { background: var(--card); border: 1px solid #1e2d52; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  label { display: block; font-size: 12px; color: var(--cyan); font-weight: 600; margin-top: 8px; margin-bottom: 3px; }
+  input, textarea, select { width: 100%; background: #060913; color: #fff; border: 1px solid #2b3f70; padding: 8px; border-radius: 6px; font-size: 12px; }
+  .copy-btn { background: var(--cyan); color: #000; border: none; padding: 7px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; margin-top: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+  <!-- ADMIN PIN LOCK SCREEN -->
+  <div id="pinLockScreen">
+    <div class="lock-card">
+      <h2>🔒 JoinRIFX AI STUDIO</h2>
+      <p>Private Broadcast & AI Manager Console<br>Enter 6-Digit Admin PIN to Unlock</p>
+      <input type="password" id="pinInput" class="pin-input" maxlength="6" placeholder="••••••" inputmode="numeric">
+      <button class="unlock-btn" onclick="verifyPin()">UNLOCK STUDIO</button>
+      <div id="pinError" style="color:var(--red); font-size:12px; margin-top:8px; font-weight:700;"></div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav">
+    <div class="logo">Join<span>RIFX</span> AI STUDIO</div>
+    <div class="nav-btns">
+      <button class="nav-btn active" onclick="showTab('matchesSection', this)">1. Matches</button>
+      <button class="nav-btn" onclick="showTab('broadcastSection', this)">2. TV Broadcast</button>
+      <button class="nav-btn" onclick="showTab('seoSection', this)">3. AI Pitch & SEO</button>
+      <button class="nav-btn" onclick="showTab('settingsSection', this)">4. Ads, Links & API</button>
+      <button class="nav-btn" style="border-color:var(--red); color:var(--red);" onclick="lockApp()">🔒 Lock</button>
+    </div>
+  </div>
+
+  <!-- TAB 1: MATCHES -->
+  <div id="matchesSection" class="section active">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>🏏 Select Match (1-Click Live TV + AI Pitch & SEO)</h3>
+      <button class="copy-btn" onclick="fetchLiveMatches()">🔄 Refresh Live Matches</button>
+    </div>
+    <div class="grid-matches" id="matchesGrid"></div>
+  </div>
+
+  <!-- TAB 2: TV BROADCAST SCREEN -->
+  <div id="broadcastSection" class="section">
+    <div class="tv-header">
+      <div class="logo" style="font-size:16px;">Join<span>RIFX</span> LIVE</div>
+      <div id="tvMatchTitle" style="font-weight:700; font-size:14px;">IND vs NZ — LIVE ODI</div>
+      <div style="background:var(--red); padding:2px 10px; border-radius:4px; font-weight:700; font-size:11px;">● LIVE</div>
+    </div>
+
+    <div class="tv-body">
+      <!-- OVERLAY 1: 20-SECOND OVER-BREAK ADVERTISEMENT ONLY (No Pitch Clutter) -->
+      <div class="overlay-screen" id="overAdBox">
+        <h2 id="adOverlayHeading">🎯 OVER COMPLETE — JOIN OUR PREDICTION SYSTEM!</h2>
+        <img id="adOverlayImg" class="sponsor-banner-img" alt="Sponsor Banner">
+        <p id="adOverlayText" style="font-size:15px; max-width:700px; color:#fff; margin:8px 0;">
+          Hamare YouTube Channel par <b>Live Match Prediction System</b> chalu hai! Aap bhi aakar join kar sakte hain.
+        </p>
+        <div style="font-size:13px; color:var(--cyan); font-weight:700; margin-top:4px;" id="adChannelLinkDisplay"></div>
+        <button class="copy-btn" onclick="closeOverlays()">Close Ad</button>
+      </div>
+
+      <!-- OVERLAY 2: SRS PITCH & MATCHUP REPORT (Shown Only 4 Times Per Match: Over 1, 10, 25, 40) -->
+      <div class="overlay-screen srs-theme" id="srsPitchBox">
+        <h2>📊 AI PITCH, HIGH SCORE & MATCHUP REPORT (SRS)</h2>
+        <div class="srs-grid-big">
+          <div class="srs-card-item"><b>PITCH CONDITION (BATTING / BOWLING)</b><span id="srsPitchText">Batting Pitch (Pace Help Early)</span></div>
+          <div class="srs-card-item"><b>WIN PERCENTAGE (H2H & VENUE)</b><span id="srsWinText">IND 58% | NZ 42%</span></div>
+          <div class="srs-card-item"><b>1ST INNINGS HIGHEST SCORE</b><span id="srsFirstText">356/5 (Avg: 282)</span></div>
+          <div class="srs-card-item"><b>2ND INNINGS HIGHEST CHASE</b><span id="srsSecondText">318/4 (Chase Win: 54%)</span></div>
+          <div class="srs-card-item"><b>BATTER vs BOWLER MATCHUP</b><span id="srsMatchupText">Kohli vs Boult: 142 Runs, 4 Outs</span></div>
+          <div class="srs-card-item"><b>TOP BOWLER ON THIS PITCH</b><span id="srsBowlerText">M. Shami: 16 Wickets (Econ 4.95)</span></div>
+        </div>
+        <button class="copy-btn" onclick="closeOverlays()">Back to Live Score</button>
+      </div>
+
+      <!-- Left Column: Scoreboard + Sound ON/OFF -->
+      <div class="tv-left">
+        <div class="tv-score-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div class="tv-team" id="tvBattingTeam">IND</div>
+              <div style="color:var(--gold); font-weight:700; font-size:16px;">OVERS: <span id="tvOvers">0.0</span></div>
+            </div>
+            <div class="tv-big-score"><span id="tvRuns">0</span>/<span id="tvWickets">0</span></div>
+          </div>
+          <div class="tv-stats">
+            <div>CRR: <span id="tvCrr" style="color:var(--green);">0.00</span></div>
+            <div>PROJECTED: <span id="tvProj" style="color:var(--gold);">0</span></div>
+            <div>VENUE: <span id="tvVenueShort" style="color:var(--cyan);">M. Chinnaswamy</span></div>
+          </div>
+          <div style="font-size:12px; color:#cbd5e1;" id="tvBatterInfo">
+            🎙️ Smart AI Scheduler: Over Ads + 4x Pitch Reports Active
+          </div>
+        </div>
+
+        <!-- Sound System & Manual Controls -->
+        <div class="sound-strip">
+          <button class="snd-btn" id="voiceToggleBtn" onclick="toggleVoice()">🔇 Voice: OFF</button>
+          <button class="snd-btn" id="musicToggleBtn" onclick="toggleMusic()">🎵 Beat: OFF</button>
+          <button class="snd-btn" onclick="simBall(1)">+1</button>
+          <button class="snd-btn" onclick="simBall(4)">+4</button>
+          <button class="snd-btn" onclick="simBall(6)">+6</button>
+          <button class="snd-btn" onclick="simWicket()">Wkt</button>
+          <button class="snd-btn gold" onclick="triggerOverAd()">📢 Ad</button>
+          <button class="snd-btn" style="border-color:var(--gold); color:var(--gold);" onclick="triggerSrsPitch()">📊 SRS Pitch</button>
+        </div>
+      </div>
+
+      <!-- Right Column: Compact Live Pitch & Matchup Card -->
+      <div class="tv-right">
+        <div>
+          <span class="ai-badge">🤖 GEMINI AI PITCH & MATCHUP</span>
+          <div class="stat-grid">
+            <div class="mini-stat"><b>PITCH TYPE</b><span id="statPitchType">Batting Pitch (Pace Help)</span></div>
+            <div class="mini-stat"><b>WIN % (H2H)</b><span id="statWinPct">IND 58% | NZ 42%</span></div>
+            <div class="mini-stat"><b>1ST INN HIGH</b><span id="statFirstHigh">356/5 (Avg: 282)</span></div>
+            <div class="mini-stat"><b>2ND INN HIGH</b><span id="statSecondHigh">318/4 (Chase: 54%)</span></div>
+          </div>
+          <div class="matchup-box">
+            <b style="color:var(--cyan);">⚔️ BATTER vs BOWLER:</b><br>
+            <span id="statMatchup">Kohli vs Boult: 142 Runs, 4 Outs</span>
+          </div>
+          <div class="matchup-box" style="border-left-color:var(--gold);">
+            <b style="color:var(--gold);">🎯 TOP BOWLER ON PITCH:</b><br>
+            <span id="statTopBowler">M. Shami: 16 Wickets (Econ 4.95)</span>
+          </div>
+        </div>
+
+        <div class="promo-box">
+          <h4 id="sideSponsorTitle">🔥 LIVE PREDICTION SYSTEM ON!</h4>
+          <p id="sidePromoText">Join Official Channel — Link in Description</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Running Bottom Ticker -->
+    <div class="ticker-wrap">
+      <div class="ticker" id="tvTickerText">
+        🏏 WELCOME TO JoinRIFX AI STUDIO ★ HAMARE YOUTUBE CHANNEL MEIN PREDICTION SYSTEM CHALU HAI, AAP AAKAR JOIN KAR SAKTE HAIN ★
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: AI PITCH GENERATOR & YOUTUBE SEO -->
+  <div id="seoSection" class="section">
+    <div class="box">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <h3>🤖 Gemini AI Match Analyzer & YouTube SEO</h3>
+        <button class="copy-btn" onclick="generateAllWithGemini()">✨ Auto-Generate Pitch Report + SEO</button>
+      </div>
+      <label>Stadium / Venue Name</label>
+      <input type="text" id="venueInput" value="M. Chinnaswamy Stadium, Bengaluru">
+
+      <label>YouTube Live Title</label>
+      <input type="text" id="seoTitle">
+      <button class="copy-btn" onclick="copyField('seoTitle')">Copy Title</button>
+
+      <label>YouTube Description</label>
+      <textarea rows="5" id="seoDesc"></textarea>
+      <button class="copy-btn" onclick="copyField('seoDesc')">Copy Description</button>
+
+      <label>Keywords & Tags</label>
+      <textarea rows="2" id="seoTags"></textarea>
+      <button class="copy-btn" onclick="copyField('seoTags')">Copy Tags</button>
+    </div>
+  </div>
+
+  <!-- TAB 4: SPONSOR AD MANAGER, COMMUNITY LINKS & API KEYS -->
+  <div id="settingsSection" class="section">
+    <div class="box">
+      <h3>📢 20-Second Over-Break Sponsor Promotion (No Betting/Gambling)</h3>
+      <label>Sponsor Mode</label>
+      <select id="sponsorMode">
+        <option value="channel">OFF (Promote My YouTube Prediction System & Channel)</option>
+        <option value="sponsor">ON (Show Paid Brand / Website Promotion Every Over)</option>
+      </select>
+      <label>Sponsor Brand / Website Name</label>
+      <input type="text" id="sponsorName" placeholder="e.g., TechGadgets India / My Affiliate Store">
+      <label>Sponsor Promotion Message (20-Sec Voice & Screen Text)</label>
+      <input type="text" id="sponsorMsg" placeholder="e.g., Best Sports Gear at 50% OFF! Visit link in description.">
+      <label>Sponsor Website / Product Link</label>
+      <input type="text" id="sponsorLink" placeholder="https://example.com">
+      <label>Sponsor Banner Poster Image URL (Optional)</label>
+      <input type="text" id="sponsorImgUrl" placeholder="Paste banner image link here">
+    </div>
+
+    <div class="box">
+      <h3>🔗 WhatsApp / Telegram Channel Link (Easy Switch)</h3>
+      <label>Platform Name (WhatsApp Channel / Telegram Channel)</label>
+      <input type="text" id="commPlatform" value="WhatsApp Channel">
+      <label>Active Link URL</label>
+      <input type="text" id="commLink" value="https://whatsapp.com/channel/0029Vb9IAva9mrGcVipktZ3h">
+    </div>
+
+    <div class="box">
+      <h3>🔑 Your Private API Keys (Saved Only on This Phone)</h3>
+      <label>Free CricketData.org API Key (For Auto Live Score)</label>
+      <input type="password" id="cricketApiKey" placeholder="Paste CricketData API key">
+      <label>Google Gemini API Key (For AI Pitch Stats, Matchups & SEO)</label>
+      <input type="password" id="geminiApiKey" placeholder="Paste Google AI Studio Gemini key">
+      <button class="copy-btn" onclick="saveSettings()">💾 Save All Settings</button>
+    </div>
+  </div>
+
+<script>
+  const ADMIN_PIN = "721441";
+
+  function verifyPin() {
+    const val = document.getElementById('pinInput').value.trim();
+    if (val === ADMIN_PIN) {
+      document.getElementById('pinLockScreen').style.display = 'none';
+      sessionStorage.setItem('rifx_unlocked', 'yes');
+    } else {
+      document.getElementById('pinError').innerText = "❌ Wrong PIN! Access Denied.";
+      document.getElementById('pinInput').value = "";
+    }
+  }
+
+  function lockApp() {
+    sessionStorage.removeItem('rifx_unlocked');
+    document.getElementById('pinInput').value = "";
+    document.getElementById('pinLockScreen').style.display = 'flex';
+  }
+
+  let state = {
+    matchTitle: "IND vs NZ — LIVE ODI",
+    teamA: "IND", teamB: "NZ",
+    runs: 0, wickets: 0, balls: 0,
+    voiceOn: false, musicOn: false,
+    platform: localStorage.getItem('rifx_plat') || "WhatsApp Channel",
+    link: localStorage.getItem('rifx_link') || "https://whatsapp.com/channel/0029Vb9IAva9mrGcVipktZ3h",
+    cricketKey: localStorage.getItem('rifx_ckey') || "",
+    geminiKey: localStorage.getItem('rifx_gkey') || "",
+    sponsorMode: localStorage.getItem('rifx_sp_mode') || "channel",
+    sponsorName: localStorage.getItem('rifx_sp_name') || "",
+    sponsorMsg: localStorage.getItem('rifx_sp_msg') || "",
+    sponsorLink: localStorage.getItem('rifx_sp_link') || "",
+    sponsorImg: localStorage.getItem('rifx_sp_img') || "",
+    activeMatchId: null,
+    srsShownOvers: []
+  };
+
+  let audioCtx = null, beatInterval = null, overlayTimer = null;
+
+  const sampleMatches = [
+    { id: "m1", title: "IND vs NZ — 2nd ODI Live", teamA: "IND", teamB: "NZ", venue: "M. Chinnaswamy Stadium, Bengaluru", status: "LIVE" },
+    { id: "m2", title: "AUS vs ENG — T20 International", teamA: "AUS", teamB: "ENG", venue: "Melbourne Cricket Ground", status: "LIVE" },
+    { id: "m3", title: "SA vs PAK — ODI Series", teamA: "SA", teamB: "PAK", venue: "Wanderers Stadium, Johannesburg", status: "UPCOMING" }
+  ];
+
+  function init() {
+    if (sessionStorage.getItem('rifx_unlocked') === 'yes') {
+      document.getElementById('pinLockScreen').style.display = 'none';
+    }
+    document.getElementById('commPlatform').value = state.platform;
+    document.getElementById('commLink').value = state.link;
+    document.getElementById('cricketApiKey').value = state.cricketKey;
+    document.getElementById('geminiApiKey').value = state.geminiKey;
+    document.getElementById('sponsorMode').value = state.sponsorMode;
+    document.getElementById('sponsorName').value = state.sponsorName;
+    document.getElementById('sponsorMsg').value = state.sponsorMsg;
+    document.getElementById('sponsorLink').value = state.sponsorLink;
+    document.getElementById('sponsorImgUrl').value = state.sponsorImg;
+    renderMatches(sampleMatches);
+    selectMatch(sampleMatches[0], false);
+    updateBranding();
+    if (state.cricketKey) fetchLiveMatches();
+  }
+
+  function showTab(id, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (btn) btn.classList.add('active');
+  }
+
+  function renderMatches(list) {
+    document.getElementById('matchesGrid').innerHTML = list.map(m => `
+      <div class="match-card">
+        <span class="badge-live">${m.status}</span>
+        <div class="teams">${m.title}</div>
+        <div style="font-size:12px; color:#94a3b8;">📍 ${m.venue || "International Venue"}</div>
+        <button class="go-btn" onclick='selectMatch(${JSON.stringify(m)}, true)'>▶ Open TV Broadcast & AI Stats</button>
+      </div>
+    `).join('');
+  }
+
+  function selectMatch(m, switchTab) {
+    state.matchTitle = m.title; state.teamA = m.teamA; state.teamB = m.teamB; state.activeMatchId = m.id;
+    state.srsShownOvers = [];
+    document.getElementById('tvMatchTitle').innerText = m.title;
+    document.getElementById('tvBattingTeam').innerText = m.teamA;
+    if (m.venue) {
+      document.getElementById('venueInput').value = m.venue;
+      document.getElementById('tvVenueShort').innerText = m.venue.split(',')[0];
+    }
+    generateDefaultSEO(m.title, m.teamA, m.teamB);
+    if (switchTab) {
+      showTab('broadcastSection', document.querySelectorAll('.nav-btn')[1]);
+      if (state.geminiKey) generateAllWithGemini(true);
+    }
+  }
+
+  function generateDefaultSEO(title, t1, t2) {
+    let sponsorLine = (state.sponsorMode === 'sponsor' && state.sponsorName)
+      ? `\n🤝 Official Stream Sponsor: ${state.sponsorName} — ${state.sponsorLink}\n` : "";
+    document.getElementById('seoTitle').value = `LIVE: ${title} Score, Pitch Report & Matchups | Prediction System | JoinRIFX`;
+    document.getElementById('seoDesc').value = `Welcome to JoinRIFX AI Cricket Studio! 🏏\nLive Score, Pitch Report, Batter-Bowler Matchups & Commentary.\n\n🎯 Hamare YouTube Channel par Live Prediction System chalu hai! Aap aakar join kar sakte hain.\n${sponsorLine}\n📲 Join Official ${state.platform}: ${state.link}\n\n#${t1}vs${t2} #CricketLive #PitchReport #JoinRIFX`;
+    document.getElementById('seoTags').value = `${t1} vs ${t2} live, ${title.toLowerCase()}, pitch report today, live cricket score, joinrifx`;
+  }
+
+  function updateBranding() {
+    if (state.sponsorMode === 'sponsor' && state.sponsorName) {
+      document.getElementById('sideSponsorTitle').innerText = `🤝 SPONSORED BY ${state.sponsorName.toUpperCase()}`;
+      document.getElementById('sidePromoText').innerText = state.sponsorMsg || "Check Sponsor Link in Description";
+      document.getElementById('tvTickerText').innerText = `🏏 JoinRIFX LIVE ★ SPONSOR: ${state.sponsorName.toUpperCase()} — ${state.sponsorMsg} ★ JOIN ${state.platform.toUpperCase()}: ${state.link} ★`;
+    } else {
+      document.getElementById('sideSponsorTitle').innerText = `🔥 LIVE PREDICTION SYSTEM ON!`;
+      document.getElementById('sidePromoText').innerText = `Join ${state.platform} — Link in Description`;
+      document.getElementById('tvTickerText').innerText = `🏏 WELCOME TO JoinRIFX LIVE ★ HAMARE YOUTUBE CHANNEL MEIN PREDICTION SYSTEM CHALU HAI, AAP AAKAR JOIN KAR SAKTE HAIN ★ JOIN ${state.platform.toUpperCase()}: ${state.link} ★`;
+    }
+  }
+
+  function saveSettings() {
+    state.sponsorMode = document.getElementById('sponsorMode').value;
+    state.sponsorName = document.getElementById('sponsorName').value;
+    state.sponsorMsg = document.getElementById('sponsorMsg').value;
+    state.sponsorLink = document.getElementById('sponsorLink').value;
+    state.sponsorImg = document.getElementById('sponsorImgUrl').value;
+    state.platform = document.getElementById('commPlatform').value;
+    state.link = document.getElementById('commLink').value;
+    state.cricketKey = document.getElementById('cricketApiKey').value;
+    state.geminiKey = document.getElementById('geminiApiKey').value;
+
+    localStorage.setItem('rifx_sp_mode', state.sponsorMode);
+    localStorage.setItem('rifx_sp_name', state.sponsorName);
+    localStorage.setItem('rifx_sp_msg', state.sponsorMsg);
+    localStorage.setItem('rifx_sp_link', state.sponsorLink);
+    localStorage.setItem('rifx_sp_img', state.sponsorImg);
+    localStorage.setItem('rifx_plat', state.platform);
+    localStorage.setItem('rifx_link', state.link);
+    localStorage.setItem('rifx_ckey', state.cricketKey);
+    localStorage.setItem('rifx_gkey', state.geminiKey);
+
+    updateBranding();
+    generateDefaultSEO(state.matchTitle, state.teamA, state.teamB);
+    alert("All Settings Saved!");
+  }
+
+  /* SOUND SYSTEM */
+  function toggleVoice() {
+    state.voiceOn = !state.voiceOn;
+    const btn = document.getElementById('voiceToggleBtn');
+    btn.innerText = state.voiceOn ? "🔊 Voice: ON" : "🔇 Voice: OFF";
+    btn.classList.toggle('on', state.voiceOn);
+    if (state.voiceOn) speakText("JoinRIFX AI Voice Commentary Activated.");
+    else window.speechSynthesis.cancel();
+  }
+
+  function speakText(text) {
+    if (!state.voiceOn || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'hi-IN';
+    window.speechSynthesis.speak(msg);
+  }
+
+  function toggleMusic() {
+    state.musicOn = !state.musicOn;
+    const btn = document.getElementById('musicToggleBtn');
+    btn.innerText = state.musicOn ? "🎵 Beat: ON" : "🎵 Beat: OFF";
+    btn.classList.toggle('purple-on', state.musicOn);
+    if (state.musicOn) {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      beatInterval = setInterval(() => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(110, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+      }, 1000);
+    } else {
+      clearInterval(beatInterval);
+    }
+  }
+
+  /* SMART AI SCHEDULER: Ad vs SRS Pitch (Never Clash!) */
+  function closeOverlays() {
+    clearTimeout(overlayTimer);
+    document.getElementById('overAdBox').style.display = 'none';
+    document.getElementById('srsPitchBox').style.display = 'none';
+  }
+
+  function handleOverComplete(overNum) {
+    // Show SRS Pitch Report ONLY on Overs 1, 10, 25, 40 (4 times per match)
+    const srsMilestones = [1, 10, 25, 40];
+    if (srsMilestones.includes(overNum) && !state.srsShownOvers.includes(overNum)) {
+      state.srsShownOvers.push(overNum);
+      triggerSrsPitch();
+    } else {
+      // On all other overs, show clean 20s Ad ONLY
+      triggerOverAd();
+    }
+  }
+
+  function triggerOverAd() {
+    closeOverlays();
+    const ad = document.getElementById('overAdBox');
+    const img = document.getElementById('adOverlayImg');
+    let voiceMsg = "";
+
+    if (state.sponsorMode === 'sponsor' && state.sponsorName) {
+      document.getElementById('adOverlayHeading').innerText = `🤝 OVER BREAK SPONSOR: ${state.sponsorName.toUpperCase()}`;
+      document.getElementById('adOverlayText').innerText = state.sponsorMsg;
+      document.getElementById('adChannelLinkDisplay').innerText = `Visit: ${state.sponsorLink}`;
+      if (state.sponsorImg) { img.src = state.sponsorImg; img.style.display = 'block'; } else { img.style.display = 'none'; }
+      voiceMsg = `Over complete. This break is sponsored by ${state.sponsorName}. ${state.sponsorMsg}`;
+    } else {
+      document.getElementById('adOverlayHeading').innerText = `🎯 OVER COMPLETE — JOIN OUR PREDICTION SYSTEM!`;
+      document.getElementById('adOverlayText').innerHTML = `Hamare YouTube Channel par <b>Live Match Prediction System</b> chalu hai! Aap bhi aakar join kar sakte hain.`;
+      document.getElementById('adChannelLinkDisplay').innerText = `Official ${state.platform}: ${state.link}`;
+      img.style.display = 'none';
+      voiceMsg = `Over samapt hua. Hamare YouTube channel par live prediction system chalu hai, aap aakar join kar sakte hain.`;
+    }
+
+    ad.style.display = 'flex';
+    speakText(voiceMsg);
+    overlayTimer = setTimeout(closeOverlays, 20000);
+  }
+
+  function triggerSrsPitch() {
+    closeOverlays();
+    document.getElementById('srsPitchText').innerText = document.getElementById('statPitchType').innerText;
+    document.getElementById('srsWinText').innerText = document.getElementById('statWinPct').innerText;
+    document.getElementById('srsFirstText').innerText = document.getElementById('statFirstHigh').innerText;
+    document.getElementById('srsSecondText').innerText = document.getElementById('statSecondHigh').innerText;
+    document.getElementById('srsMatchupText').innerText = document.getElementById('statMatchup').innerText;
+    document.getElementById('srsBowlerText').innerText = document.getElementById('statTopBowler').innerText;
+
+    document.getElementById('srsPitchBox').style.display = 'flex';
+    speakText(`Match Pitch Report Update. ${document.getElementById('statPitchType').innerText}. First Innings Highest: ${document.getElementById('statFirstHigh').innerText}. Top Bowler: ${document.getElementById('statTopBowler').innerText}.`);
+    overlayTimer = setTimeout(closeOverlays, 18000);
+  }
+
+  /* Score Controls */
+  function simBall(r) {
+    state.runs += r; state.balls += 1; updateScoreUI();
+    if (state.balls % 6 === 0) handleOverComplete(state.balls / 6);
+  }
+  function simWicket() {
+    state.wickets += 1; state.balls += 1; updateScoreUI();
+    if (state.balls % 6 === 0) handleOverComplete(state.balls / 6);
+  }
+  function updateScoreUI() {
+    document.getElementById('tvRuns').innerText = state.runs;
+    document.getElementById('tvWickets').innerText = state.wickets;
+    document.getElementById('tvOvers').innerText = Math.floor(state.balls / 6) + "." + (state.balls % 6);
+    let crr = state.balls > 0 ? (state.runs / (state.balls / 6)).toFixed(2) : "0.00";
+    document.getElementById('tvCrr').innerText = crr;
+    document.getElementById('tvProj').innerText = Math.round(crr * 50);
+  }
+
+  /* Live CricketData API */
+  async function fetchLiveMatches() {
+    if (!state.cricketKey) return alert("Tab 4 mein apni free CricketData API key dalein.");
+    try {
+      const res = await fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${state.cricketKey}&offset=0`);
+      const data = await res.json();
+      if (data.data) {
+        renderMatches(data.data.slice(0, 8).map(m => ({
+          id: m.id, title: m.name,
+          teamA: m.teamInfo?.[0]?.shortname || "T1",
+          teamB: m.teamInfo?.[1]?.shortname || "T2",
+          venue: m.venue || "Cricket Stadium",
+          status: m.status
+        })));
+      }
+    } catch (e) { alert("API Error. Check Cricket API key."); }
+  }
+
+  /* Auto Refresh Score Every 25s */
+  setInterval(async () => {
+    if (!state.cricketKey || !state.activeMatchId) return;
+    try {
+      const res = await fetch(`https://api.cricapi.com/v1/match_info?apikey=${state.cricketKey}&id=${state.activeMatchId}`);
+      const data = await res.json();
+      if (data.data && data.data.score && data.data.score.length > 0) {
+        const latest = data.data.score[data.data.score.length - 1];
+        const prevOvers = document.getElementById('tvOvers').innerText;
+        document.getElementById('tvRuns').innerText = latest.r;
+        document.getElementById('tvWickets').innerText = latest.w;
+        document.getElementById('tvOvers').innerText = latest.o;
+        if (String(latest.o).endsWith('.0') && String(latest.o) !== prevOvers && latest.o > 0) {
+          handleOverComplete(Math.round(latest.o));
+        }
+      }
+    } catch (e) {}
+  }, 25000);
+
+  /* Gemini AI Deep Pitch, Matchups & SEO Generator */
+  async function generateAllWithGemini(silent = false) {
+    if (!state.geminiKey) { if (!silent) alert("Tab 4 mein apni Google Gemini API key dalein."); return; }
+    const venue = document.getElementById('venueInput').value;
+    const prompt = `Analyze cricket match "${state.matchTitle}" at "${venue}". Return ONLY valid JSON with keys:
+    "pitchType" (Batting Pitch / Bowling Pitch & Pace/Spin help),
+    "winPct" (head to head & venue win percentage),
+    "firstHigh" (1st innings highest score at this venue),
+    "secondHigh" (2nd innings highest chase score at this venue),
+    "matchup" (key batter vs bowler matchup stat),
+    "topBowler" (bowler with most wickets on this pitch),
+    "seoTitle" (YouTube live stream title for JoinRIFX),
+    "seoDesc" (YouTube description including ${state.link} and Live Prediction System on JoinRIFX),
+    "seoTags" (comma separated tags).`;
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      const raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+      const j = JSON.parse(raw);
+      document.getElementById('statPitchType').innerText = j.pitchType;
+      document.getElementById('statWinPct').innerText = j.winPct;
+      document.getElementById('statFirstHigh').innerText = j.firstHigh;
+      document.getElementById('statSecondHigh').innerText = j.secondHigh;
+      document.getElementById('statMatchup').innerText = j.matchup;
+      document.getElementById('statTopBowler').innerText = j.topBowler;
+      document.getElementById('seoTitle').value = j.seoTitle;
+      document.getElementById('seoDesc').value = j.seoDesc;
+      document.getElementById('seoTags').value = j.seoTags;
+      if (!silent) alert("Gemini AI ne Pitch Report, Matchups, High Scores aur SEO update kar diya hai!");
+    } catch (e) { if (!silent) alert("Gemini AI fetch error. Check API key."); }
+  }
+
+  function copyField(id) {
+    const el = document.getElementById(id);
+    el.select();
+    navigator.clipboard.writeText(el.value);
+    alert("Copied!");
+  }
+
+  init();
+</script>
+</body>
+</html>
