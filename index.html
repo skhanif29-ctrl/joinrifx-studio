@@ -616,4 +616,386 @@
 </script>
 </body>
 </html>
+<script>
+  const ADMIN_PIN = "721441";
+
+  function verifyPin() {
+    const val = document.getElementById('pinInput').value.trim();
+    if (val === ADMIN_PIN) {
+      document.getElementById('pinLockScreen').style.display = 'none';
+      sessionStorage.setItem('rifx_unlocked', 'yes');
+    } else {
+      document.getElementById('pinError').innerText = "❌ Wrong PIN! Access Denied.";
+      document.getElementById('pinInput').value = "";
+    }
+  }
+
+  function lockApp() {
+    sessionStorage.removeItem('rifx_unlocked');
+    document.getElementById('pinInput').value = "";
+    document.getElementById('pinLockScreen').style.display = 'flex';
+  }
+
+  let state = {
+    matchTitle: "IND vs NZ — LIVE ODI",
+    teamA: "IND", teamB: "NZ",
+    runs: 0, wickets: 0, balls: 0,
+    voiceOn: false, sfxOn: false, musicOn: false,
+    platform: localStorage.getItem('rifx_plat') || "WhatsApp Channel",
+    link: localStorage.getItem('rifx_link') || "https://www.whatsapp.com/channel/0029Vb9IAva9mrGcVipktZ3h",
+    cricketKey: localStorage.getItem('rifx_ckey') || "",
+    geminiKey: localStorage.getItem('rifx_gkey') || "",
+    sponsorMode: localStorage.getItem('rifx_sp_mode') || "channel",
+    sponsorAutoDelete: localStorage.getItem('rifx_sp_auto') || "yes",
+    sponsorDuration: parseInt(localStorage.getItem('rifx_sp_dur')) || 20,
+    sponsorName: localStorage.getItem('rifx_sp_name') || "",
+    sponsorMsg: localStorage.getItem('rifx_sp_msg') || "",
+    sponsorLink: localStorage.getItem('rifx_sp_link') || "",
+    sponsorImg: localStorage.getItem('rifx_sp_img') || "",
+    sponsorVideo: localStorage.getItem('rifx_sp_vid') || "",
+    activeMatchId: null,
+    srsShownOvers: [],
+    allMatchesCache: []
+  };
+
+  let audioCtx = null, beatInterval = null, overlayTimer = null;
+
+  const sampleMatches = [
+    { id: "m1", title: "IND vs NZ — 2nd ODI Live", teamA: "IND", teamB: "NZ", venue: "M. Chinnaswamy Stadium, Bengaluru", status: "LIVE", cat: "INT", matchType: "ODI" },
+    { id: "m2", title: "Mumbai vs Bengal — Ranji Trophy Elite", teamA: "MUM", teamB: "BEN", venue: "Wankhede Stadium, Mumbai", status: "LIVE", cat: "DOM", matchType: "RANJI" },
+    { id: "m3", title: "AUS vs ENG — T20 International", teamA: "AUS", teamB: "ENG", venue: "Melbourne Cricket Ground", status: "LIVE", cat: "INT", matchType: "T20I" },
+    { id: "m4", title: "Karnataka vs Tamil Nadu — Ranji Trophy", teamA: "KAR", teamB: "TN", venue: "MA Chidambaram Stadium, Chennai", status: "UPCOMING", cat: "DOM", matchType: "RANJI" }
+  ];
+
+  function init() {
+    if (sessionStorage.getItem('rifx_unlocked') === 'yes') {
+      document.getElementById('pinLockScreen').style.display = 'none';
+    }
+    document.getElementById('commPlatform').value = state.platform;
+    document.getElementById('commLink').value = state.link;
+    document.getElementById('cricketApiKey').value = state.cricketKey;
+    document.getElementById('geminiApiKey').value = state.geminiKey;
+    syncSponsorUI();
+    state.allMatchesCache = sampleMatches;
+    renderMatches(sampleMatches);
+    selectMatch(sampleMatches[0], false, true);
+    updateBranding();
+    if (state.cricketKey) fetchLiveMatches();
+  }
+
+  function syncSponsorUI() {
+    document.getElementById('sponsorMode').value = state.sponsorMode;
+    document.getElementById('sponsorAutoDelete').value = state.sponsorAutoDelete;
+    document.getElementById('sponsorDuration').value = state.sponsorDuration;
+    document.getElementById('sponsorName').value = state.sponsorName;
+    document.getElementById('sponsorMsg').value = state.sponsorMsg;
+    document.getElementById('sponsorLink').value = state.sponsorLink;
+    document.getElementById('sponsorImgUrl').value = state.sponsorImg;
+    document.getElementById('sponsorVideoUrl').value = state.sponsorVideo;
+  }
+
+  function clearSponsorData(manual = false) {
+    closeOverlays();
+    state.sponsorMode = "channel";
+    state.sponsorName = ""; state.sponsorMsg = ""; state.sponsorLink = "";
+    state.sponsorImg = ""; state.sponsorVideo = "";
+    localStorage.setItem('rifx_sp_mode', "channel");
+    localStorage.removeItem('rifx_sp_name'); localStorage.removeItem('rifx_sp_msg');
+    localStorage.removeItem('rifx_sp_link'); localStorage.removeItem('rifx_sp_img');
+    localStorage.removeItem('rifx_sp_vid');
+    syncSponsorUI(); updateBranding();
+    generateDefaultSEO(state.matchTitle, state.teamA, state.teamB);
+    if (manual) alert("Sponsor Banner & Video Deleted!");
+  }
+
+  function endMatchAndClearAd() {
+    if (state.sponsorAutoDelete === 'yes' && state.sponsorMode === 'sponsor') {
+      clearSponsorData(false);
+      alert("Match Ended! Client ka Sponsor Banner & Video automatic delete ho gaya hai.");
+    } else {
+      alert("Match Ended!");
+    }
+    showTab('matchesSection', document.querySelectorAll('.nav-btn')[0]);
+  }
+
+  function showTab(id, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (btn) btn.classList.add('active');
+  }
+
+  function filterMatches(cat, btn) {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    if (cat === 'ALL') renderMatches(state.allMatchesCache);
+    else renderMatches(state.allMatchesCache.filter(m => m.cat === cat));
+  }
+
+  function renderMatches(list) {
+    document.getElementById('matchesGrid').innerHTML = list.map(m => `
+      <div class="match-card">
+        <div><span class="badge-live">${m.status}</span><span class="badge-type">${m.matchType || 'MATCH'}</span></div>
+        <div class="teams">${m.title}</div>
+        <div style="font-size:12px; color:#94a3b8;">📍 ${m.venue || "Cricket Stadium"}</div>
+        <button class="go-btn" onclick='selectMatch(${JSON.stringify(m)}, true, false)'>▶ 1-Click Start TV + AI Pitch & SEO</button>
+      </div>
+    `).join('');
+  }
+
+  function selectMatch(m, switchTab, isInitial = false) {
+    if (!isInitial && state.activeMatchId && state.activeMatchId !== m.id && state.sponsorAutoDelete === 'yes' && state.sponsorMode === 'sponsor') {
+      clearSponsorData(false);
+    }
+    state.matchTitle = m.title; state.teamA = m.teamA; state.teamB = m.teamB; state.activeMatchId = m.id;
+    state.runs = 0; state.wickets = 0; state.balls = 0; updateScoreUI();
+    state.srsShownOvers = [];
+    document.getElementById('tvMatchTitle').innerText = m.title;
+    document.getElementById('tvBattingTeam').innerText = m.teamA;
+    if (m.venue) {
+      document.getElementById('venueInput').value = m.venue;
+      document.getElementById('tvVenueShort').innerText = m.venue.split(',')[0];
+    }
+    generateDefaultSEO(m.title, m.teamA, m.teamB);
+    drawThumbnail();
+    if (switchTab) {
+      showTab('broadcastSection', document.querySelectorAll('.nav-btn')[1]);
+      if (state.geminiKey) generateAllWithGemini(true);
+    }
+  }
+
+  function generateDefaultSEO(title, t1, t2) {
+    let sponsorLine = (state.sponsorMode === 'sponsor' && state.sponsorName) ? `\n🤝 Official Stream Sponsor: ${state.sponsorName} — ${state.sponsorLink}\n` : "";
+    document.getElementById('seoTitle').value = `LIVE: ${title} Score, Pitch Report & Commentary | Prediction System | JoinRIFX`;
+    document.getElementById('seoDesc').value = `Welcome to JoinRIFX AI Cricket Studio! 🏏\nLive Score, Pitch Report, Batter-Bowler Matchups & Commentary.\n\n🎯 Hamare YouTube Channel par Live Prediction System chalu hai! Aap aakar join kar sakte hain.\n${sponsorLine}\n📲 Follow the JoinRIFX channel on ${state.platform}: ${state.link}\n\n#${t1}vs${t2} #CricketLive #LiveScore #PitchReport #JoinRIFX`;
+    document.getElementById('seoTags').value = `${t1} vs ${t2} live, ${t1} vs ${t2} live match today, ${title.toLowerCase()}, live cricket match today, live cricket score, pitch report today, ball by ball commentary, joinrifx live, cricket prediction live`;
+  }
+
+  function drawThumbnail() {
+    const c = document.getElementById('thumbCanvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 1280, 720);
+    grad.addColorStop(0, '#060913'); grad.addColorStop(0.5, '#1e0b4d'); grad.addColorStop(1, '#091936');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 1280, 720);
+    ctx.strokeStyle = '#00E5FF'; ctx.lineWidth = 12; ctx.strokeRect(20, 20, 1240, 680);
+    ctx.fillStyle = '#ff2a5f'; ctx.fillRect(60, 55, 230, 58);
+    ctx.fillStyle = '#fff'; ctx.font = '900 32px Montserrat, sans-serif'; ctx.fillText('● LIVE NOW', 82, 95);
+    ctx.fillStyle = '#00E5FF'; ctx.font = '900 36px Montserrat, sans-serif'; ctx.fillText('JoinRIFX AI STUDIO', 860, 95);
+    ctx.fillStyle = '#fff'; ctx.font = '900 135px Montserrat, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`${state.teamA}  VS  ${state.teamB}`, 640, 340);
+    ctx.fillStyle = '#F5AF19'; ctx.font = '900 46px Montserrat, sans-serif';
+    ctx.fillText('LIVE SCORE • AI PITCH REPORT • PREDICTION SYSTEM', 640, 445);
+    ctx.fillStyle = '#00E5FF'; ctx.font = '700 32px Poppins, sans-serif';
+    ctx.fillText(document.getElementById('venueInput').value, 640, 530);
+    ctx.fillStyle = '#6a11cb'; ctx.fillRect(140, 585, 1000, 72);
+    ctx.fillStyle = '#fff'; ctx.font = '900 32px Montserrat, sans-serif';
+    ctx.fillText('JOIN OUR PREDICTION SYSTEM — LINK IN DESCRIPTION', 640, 632);
+    ctx.textAlign = 'left';
+  }
+
+  function downloadThumbnail() {
+    drawThumbnail();
+    const link = document.createElement('a');
+    link.download = `${state.teamA}_vs_${state.teamB}_JoinRIFX_Thumbnail.png`;
+    link.href = document.getElementById('thumbCanvas').toDataURL('image/png');
+    link.click();
+  }
+
+  function updateBranding() {
+    if (state.sponsorMode === 'sponsor' && (state.sponsorName || state.sponsorImg || state.sponsorVideo)) {
+      document.getElementById('sideSponsorTitle').innerText = `🤝 SPONSORED BY ${(state.sponsorName || 'PARTNER').toUpperCase()}`;
+      document.getElementById('sidePromoText').innerText = state.sponsorMsg || "Check Sponsor Link in Description";
+      document.getElementById('tvTickerText').innerText = `🏏 JoinRIFX LIVE ★ SPONSOR: ${(state.sponsorName || 'PARTNER').toUpperCase()} — ${state.sponsorMsg} ★ JOIN ${state.platform.toUpperCase()}: ${state.link} ★`;
+    } else {
+      document.getElementById('sideSponsorTitle').innerText = `🔥 LIVE PREDICTION SYSTEM ON!`;
+      document.getElementById('sidePromoText').innerText = `Join ${state.platform} — Link in Description`;
+      document.getElementById('tvTickerText').innerText = `🏏 WELCOME TO JoinRIFX LIVE ★ HAMARE YOUTUBE CHANNEL MEIN PREDICTION SYSTEM CHALU HAI, AAP AAKAR JOIN KAR SAKTE HAIN ★ JOIN ${state.platform.toUpperCase()}: ${state.link} ★`;
+    }
+  }
+
+  function saveSettings() {
+    state.sponsorMode = document.getElementById('sponsorMode').value;
+    state.sponsorAutoDelete = document.getElementById('sponsorAutoDelete').value;
+    state.sponsorDuration = parseInt(document.getElementById('sponsorDuration').value) || 20;
+    state.sponsorName = document.getElementById('sponsorName').value;
+    state.sponsorMsg = document.getElementById('sponsorMsg').value;
+    state.sponsorLink = document.getElementById('sponsorLink').value;
+    state.sponsorImg = document.getElementById('sponsorImgUrl').value;
+    state.sponsorVideo = document.getElementById('sponsorVideoUrl').value;
+    state.platform = document.getElementById('commPlatform').value;
+    state.link = document.getElementById('commLink').value;
+    state.cricketKey = document.getElementById('cricketApiKey').value;
+    state.geminiKey = document.getElementById('geminiApiKey').value;
+    localStorage.setItem('rifx_sp_mode', state.sponsorMode); localStorage.setItem('rifx_sp_auto', state.sponsorAutoDelete);
+    localStorage.setItem('rifx_sp_dur', state.sponsorDuration); localStorage.setItem('rifx_sp_name', state.sponsorName);
+    localStorage.setItem('rifx_sp_msg', state.sponsorMsg); localStorage.setItem('rifx_sp_link', state.sponsorLink);
+    localStorage.setItem('rifx_sp_img', state.sponsorImg); localStorage.setItem('rifx_sp_vid', state.sponsorVideo);
+    localStorage.setItem('rifx_plat', state.platform); localStorage.setItem('rifx_link', state.link);
+    localStorage.setItem('rifx_ckey', state.cricketKey); localStorage.setItem('rifx_gkey', state.geminiKey);
+    updateBranding(); generateDefaultSEO(state.matchTitle, state.teamA, state.teamB);
+    alert("All Admin Settings & API Keys Saved!");
+  }
+
+  function ensureAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+  function toggleSfx() {
+    state.sfxOn = !state.sfxOn; const btn = document.getElementById('sfxToggleBtn');
+    btn.innerText = state.sfxOn ? "🏟️ Stadium SFX: ON" : "🏟️ Stadium SFX: OFF"; btn.classList.toggle('on', state.sfxOn);
+    if (state.sfxOn) { ensureAudio(); playCrowdRoar(1.2); }
+  }
+  function playCrowdRoar(duration = 2.2) {
+    if (!state.sfxOn) return; ensureAudio();
+    const bufferSize = audioCtx.sampleRate * duration; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((i / bufferSize) * Math.PI);
+    const noise = audioCtx.createBufferSource(); noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.setValueAtTime(650, audioCtx.currentTime);
+    const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.28, audioCtx.currentTime + 0.3); gain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + duration);
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); noise.start();
+  }
+  function playBowlingWhoosh() {
+    if (!state.sfxOn) return; ensureAudio();
+    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(520, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.25);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+  }
+  function playBoundarySound(runs) {
+    if (!state.sfxOn) return; ensureAudio(); playCrowdRoar(runs === 6 ? 2.8 : 2.0);
+    (runs === 6 ? [523.25, 659.25, 783.99, 1046.5] : [440, 554.37, 659.25]).forEach((freq, idx) => {
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.11);
+      gain.gain.setValueAtTime(0.11, audioCtx.currentTime + idx * 0.11); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.11 + 0.35);
+      osc.connect(gain); gain.connect(audioCtx.destination); osc.start(audioCtx.currentTime + idx * 0.11); osc.stop(audioCtx.currentTime + idx * 0.11 + 0.35);
+    });
+  }
+  function playWicketSound() {
+    if (!state.sfxOn) return; ensureAudio(); playCrowdRoar(2.4);
+    [330, 277, 220, 110].forEach((f, idx) => {
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(f, audioCtx.currentTime + idx * 0.14);
+      gain.gain.setValueAtTime(0.16, audioCtx.currentTime + idx * 0.14); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.14 + 0.45);
+      osc.connect(gain); gain.connect(audioCtx.destination); osc.start(audioCtx.currentTime + idx * 0.14); osc.stop(audioCtx.currentTime + idx * 0.14 + 0.45);
+    });
+  }
+  function toggleMusic() {
+    state.musicOn = !state.musicOn; const btn = document.getElementById('musicToggleBtn');
+    btn.innerText = state.musicOn ? "⏳ Tension Loop: ON" : "⏳ Tension Loop: OFF"; btn.classList.toggle('purple-on', state.musicOn);
+    if (state.musicOn) {
+      ensureAudio(); let step = 0;
+      beatInterval = setInterval(() => {
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(step % 2 === 0 ? 95 : 125, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.28);
+        osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.28); step++;
+      }, 650);
+    } else clearInterval(beatInterval);
+  }
+  function toggleVoice() {
+    state.voiceOn = !state.voiceOn; const btn = document.getElementById('voiceToggleBtn');
+    btn.innerText = state.voiceOn ? "🔊 Voice: ON" : "🔇 Voice: OFF"; btn.classList.toggle('on', state.voiceOn);
+    if (state.voiceOn) speakText("JoinRIFX AI Voice Commentary Activated."); else window.speechSynthesis.cancel();
+  }
+  function speakText(text) {
+    if (!state.voiceOn || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel(); const msg = new SpeechSynthesisUtterance(text); msg.lang = 'hi-IN'; window.speechSynthesis.speak(msg);
+  }
+  function closeOverlays() {
+    clearTimeout(overlayTimer);
+    const vid = document.getElementById('adOverlayVideo'); if (vid) { vid.pause(); vid.style.display = 'none'; }
+    document.getElementById('overAdBox').style.display = 'none'; document.getElementById('srsPitchBox').style.display = 'none';
+  }
+  function handleOverComplete(overNum) {
+    if ([1, 10, 25, 40].includes(overNum) && !state.srsShownOvers.includes(overNum)) { state.srsShownOvers.push(overNum); triggerSrsPitch(); }
+    else triggerOverAd();
+  }
+  function triggerOverAd() {
+    closeOverlays();
+    const ad = document.getElementById('overAdBox'); const img = document.getElementById('adOverlayImg'); const vid = document.getElementById('adOverlayVideo');
+    let voiceMsg = "";
+    if (state.sponsorMode === 'sponsor' && (state.sponsorName || state.sponsorVideo || state.sponsorImg)) {
+      document.getElementById('adOverlayHeading').innerText = `🤝 OVER BREAK SPONSOR: ${(state.sponsorName || 'OFFICIAL PARTNER').toUpperCase()}`;
+      document.getElementById('adOverlayText').innerText = state.sponsorMsg;
+      document.getElementById('adChannelLinkDisplay').innerText = state.sponsorLink ? `Visit: ${state.sponsorLink}` : "";
+      if (state.sponsorVideo) { img.style.display = 'none'; vid.src = state.sponsorVideo; vid.style.display = 'block'; vid.play().catch(() => {}); }
+      else if (state.sponsorImg) { vid.style.display = 'none'; img.src = state.sponsorImg; img.style.display = 'block'; }
+      voiceMsg = `Over complete. This break is sponsored by ${state.sponsorName}. ${state.sponsorMsg}`;
+    } else {
+      document.getElementById('adOverlayHeading').innerText = `🎯 OVER COMPLETE — JOIN OUR PREDICTION SYSTEM!`;
+      document.getElementById('adOverlayText').innerHTML = `Hamare YouTube Channel par <b>Live Match Prediction System</b> chalu hai! Aap bhi aakar join kar sakte hain.`;
+      document.getElementById('adChannelLinkDisplay').innerText = `Official ${state.platform}: ${state.link}`;
+      vid.style.display = 'none'; img.style.display = 'none';
+      voiceMsg = `Over samapt hua. Hamare YouTube channel par live prediction system chalu hai, aap aakar join kar sakte hain.`;
+    }
+    ad.style.display = 'flex'; speakText(voiceMsg);
+    overlayTimer = setTimeout(closeOverlays, state.sponsorDuration * 1000);
+  }
+  function triggerSrsPitch() {
+    closeOverlays();
+    document.getElementById('srsPitchText').innerText = document.getElementById('statPitchType').innerText;
+    document.getElementById('srsWinText').innerText = document.getElementById('statWinPct').innerText;
+    document.getElementById('srsFirstText').innerText = document.getElementById('statFirstHigh').innerText;
+    document.getElementById('srsSecondText').innerText = document.getElementById('statSecondHigh').innerText;
+    document.getElementById('srsMatchupText').innerText = document.getElementById('statMatchup').innerText;
+    document.getElementById('srsBowlerText').innerText = document.getElementById('statTopBowler').innerText;
+    document.getElementById('srsPitchBox').style.display = 'flex';
+    speakText(`Match Pitch Report Update. ${document.getElementById('statPitchType').innerText}.`);
+    overlayTimer = setTimeout(closeOverlays, 18000);
+  }
+  function simBall(r) {
+    playBowlingWhoosh(); state.runs += r; state.balls += 1; updateScoreUI();
+    if (r === 4 || r === 6) { playBoundarySound(r); speakText(r === 6 ? "Shandaar chhakka!" : "Tez chauka!"); }
+    if (state.balls % 6 === 0) handleOverComplete(state.balls / 6);
+  }
+  function simWicket() {
+    playBowlingWhoosh(); state.wickets += 1; state.balls += 1; updateScoreUI(); playWicketSound();
+    speakText("Out! Bada wicket gira hai!");
+    if (state.balls % 6 === 0) handleOverComplete(state.balls / 6);
+  }
+  function updateScoreUI() {
+    document.getElementById('tvRuns').innerText = state.runs; document.getElementById('tvWickets').innerText = state.wickets;
+    document.getElementById('tvOvers').innerText = Math.floor(state.balls / 6) + "." + (state.balls % 6);
+    let crr = state.balls > 0 ? (state.runs / (state.balls / 6)).toFixed(2) : "0.00";
+    document.getElementById('tvCrr').innerText = crr; document.getElementById('tvProj').innerText = Math.round(crr * 50);
+  }
+  async function fetchLiveMatches() {
+    if (!state.cricketKey) return alert("Tab 4 mein apni free CricketData API key dalein.");
+    try {
+      const res = await fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${state.cricketKey}&offset=0`);
+      const data = await res.json();
+      if (data.data) {
+        const intlTeams = ['IND','AUS','ENG','NZ','SA','PAK','SL','BAN','WI','AFG','ZIM','IRE','NED','SCO','NEP','UAE','USA','NAM','OMA'];
+        state.allMatchesCache = data.data.map(m => {
+          const t1 = m.teamInfo?.[0]?.shortname || "T1"; const t2 = m.teamInfo?.[1]?.shortname || "T2";
+          const isIntl = intlTeams.includes(t1.toUpperCase()) && intlTeams.includes(t2.toUpperCase());
+          return { id: m.id, title: m.name, teamA: t1, teamB: t2, venue: m.venue || "Cricket Stadium", status: m.status, cat: isIntl ? "INT" : "DOM", matchType: (m.matchType || "LIVE").toUpperCase() };
+        });
+        renderMatches(state.allMatchesCache);
+      }
+    } catch (e) { alert("API Error. Check Cricket API key."); }
+  }
+  async function generateAllWithGemini(silent = false) {
+    drawThumbnail();
+    if (!state.geminiKey) { if (!silent) alert("Tab 4 mein apni Google Gemini API key dalein."); return; }
+    const venue = document.getElementById('venueInput').value;
+    const prompt = `Analyze cricket match "${state.matchTitle}" at "${venue}". Return ONLY valid JSON with keys: "pitchType", "winPct", "firstHigh", "secondHigh", "matchup", "topBowler", "seoTitle", "seoDesc", "seoTags".`;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiKey}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      const j = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim());
+      document.getElementById('statPitchType').innerText = j.pitchType; document.getElementById('statWinPct').innerText = j.winPct;
+      document.getElementById('statFirstHigh').innerText = j.firstHigh; document.getElementById('statSecondHigh').innerText = j.secondHigh;
+      document.getElementById('statMatchup').innerText = j.matchup; document.getElementById('statTopBowler').innerText = j.topBowler;
+      document.getElementById('seoTitle').value = j.seoTitle; document.getElementById('seoDesc').value = j.seoDesc; document.getElementById('seoTags').value = j.seoTags;
+      if (!silent) alert("Gemini AI ne Pitch Report, SEO aur Thumbnail update kar diya hai!");
+    } catch (e) { if (!silent) alert("Gemini AI fetch error."); }
+  }
+  function copyField(id) { const el = document.getElementById(id); el.select(); navigator.clipboard.writeText(el.value); alert("Copied!"); }
+  init();
+</script>
+</body>
+</html>
 
